@@ -15,9 +15,11 @@ namespace ChatServer
             _listener = new TcpListener(IPAddress.Parse("127.0.0.1"), 7891);
             _listener.Start();
 
-
-            var client = new Client(_listener.AcceptTcpClient());
-
+            while (true)
+            {
+                var client = new Client(_listener.AcceptTcpClient());
+                _users.Add(client);
+            }
         }
     }
 }
