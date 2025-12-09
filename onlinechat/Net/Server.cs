@@ -7,7 +7,9 @@ namespace ChatClient.Net
     class Server
     {
         TcpClient _client;
-        PacketBuilder _packetBuilder;
+        public PacketReader PacketReader;
+
+        public event Action connectedEvent;
 
         public Server()
         {
@@ -19,12 +21,47 @@ namespace ChatClient.Net
             if (!_client.Connected)
             {
                 _client.Connect("127.0.0.1", 7891);
-                var connectPacket = new PacketBuilder();
-                connectPacket.WriteOpCode(0);
-                connectPacket.WriteMessage(username);
-                _client.Client.Send(connectPacket.GetPacketBytes());
+                PacketReader = new PacketReader(_client.GetStream());
+
+                if(!_client.Connected)
+                {
+                    var connectPacket = new PacketBuilder();
+                    connectPacket.WriteOpCode(0);
+                    connectPacket.WriteMessage(username);
+                    _client.Client.Send(connectPacket.GetPacketBytes());
+                }
+                ReadPackets();
+                
 
             }
+        }
+
+        public void ReadPackets() 
+        {
+            Task.Run(() =>
+            {
+                while (true)
+                {
+                    var opcode = PacketReader.ReadByte();
+                    switch (opcode)
+                    {
+                        case 1:
+                            connectedEvent?.Invoke();
+                            break;
+                        default:
+                            Console.WriteLine("да");
+                            break;
+                    }
+                }
+            });
+        }
+
+        public void SendMessageToServer(string message) 
+        {
+            var messagePacket = new PacketBuilder();
+            messagePacket.WriteOpCode(5);
+            messagePacket.WriteMessage(message);
+            _client.Client.Send(messagePacket.GetPacketBytes());
         }
     }
 }
