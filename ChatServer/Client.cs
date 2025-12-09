@@ -14,6 +14,8 @@ namespace ChatServer
         public Guid UID { get; set; }
         public TcpClient ClientSocket { get; set; }
 
+        
+
         PacketReader _packetReader;
         public Client(TcpClient client)
         {
@@ -27,6 +29,32 @@ namespace ChatServer
 
 
             Console.WriteLine($"{DateTime.Now}: Client podkl s imenem {Username}");
+        }
+
+        void Process()
+        {
+            while (true)
+            {
+                try
+                {
+                    var opcode = _packetReader.ReadByte();
+                    switch (opcode)
+                    {
+                        case 5:
+                            var msg = _packetReader.ReadMessage();
+                            Console.WriteLine($"[{DateTime.Now}]: Сообщение доставлено! {msg}");
+                            Program.BroadcastMessage(msg);
+                            break;
+                        default:
+                            break;
+                    }
+                }
+                catch (Exception)
+                {
+                    Console.WriteLine($"[{UID.ToString()}]: отключился");
+                    ClientSocket.Close();
+                }
+            }
         }
     }
 }

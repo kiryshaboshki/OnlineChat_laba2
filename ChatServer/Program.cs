@@ -6,7 +6,7 @@ using System.Net.Sockets;
 
 namespace ChatServer
 {
-    class Programm
+    class Program
     {
         static List<Client> _users;
         static TcpListener _listener;
