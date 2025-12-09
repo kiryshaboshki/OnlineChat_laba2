@@ -62,6 +62,8 @@ namespace ChatServer
                 broadcastPacket.WriteMessage(uid);
                 user.ClientSocket.Client.Send(broadcastPacket.GetPacketBytes());
             }
+
+            BroadcastMessage($"[{disconnectedUser.Username}] отключился!");
         }
     }
 }

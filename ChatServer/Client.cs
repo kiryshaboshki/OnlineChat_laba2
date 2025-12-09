@@ -42,7 +42,7 @@ namespace ChatServer
                     {
                         case 5:
                             var msg = _packetReader.ReadMessage();
-                            Console.WriteLine($"[{DateTime.Now}]: Сообщение доставлено! {msg}");
+                            Console.WriteLine($"[{DateTime.Now}]: Сообщение получено! {msg}");
                             Program.BroadcastMessage(msg);
                             break;
                         default:
