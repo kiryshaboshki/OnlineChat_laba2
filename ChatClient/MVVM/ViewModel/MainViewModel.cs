@@ -31,9 +31,16 @@ namespace ChatClient.MVVM.ViewModel
             _server = new Server();
             _server.connectedEvent += UserConnected;
             _server.msgReceivedEvent += MessageReceived;
-            _server.userDisconnectEvent += UserConnected;
+            _server.userDisconnectEvent += RemoveUser;
             ConnectToServerCommand = new RelayCommand(o => _server.ConnectToServer(Username), o => !string.IsNullOrEmpty(Username));
             SendMessageCommand = new RelayCommand(o => _server.SendMessageToServer(Message), o => !string.IsNullOrEmpty(Message));
+        }
+
+        private void RemoveUser()
+        {
+            var uid = _server.PacketReader.ReadMessage();
+            var user = Users.Where(x => x.UID == uid).FirstOrDefault();
+            Application.Current.Dispatcher.Invoke(() => Users.Remove(user));
         }
 
         private void MessageReceived()

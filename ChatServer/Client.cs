@@ -29,6 +29,8 @@ namespace ChatServer
 
 
             Console.WriteLine($"{DateTime.Now}: Client podkl s imenem {Username}");
+
+            Task.Run(() => Process());
         }
 
         void Process()
@@ -42,8 +44,8 @@ namespace ChatServer
                     {
                         case 5:
                             var msg = _packetReader.ReadMessage();
-                            Console.WriteLine($"[{DateTime.Now}]: Сообщение получено! {msg}");
-                            Program.BroadcastMessage(msg);
+                            Console.WriteLine($"[{DateTime.Now}]: Получено сообщение! {msg}");
+                            Program.BroadcastMessage($"[{DateTime.Now}] : [{Username}]: {msg}");
                             break;
                         default:
                             break;
@@ -52,6 +54,7 @@ namespace ChatServer
                 catch (Exception)
                 {
                     Console.WriteLine($"[{UID.ToString()}]: отключился");
+                    Program.BroadcastDisconnect(UID.ToString());
                     ClientSocket.Close();
                 }
             }
