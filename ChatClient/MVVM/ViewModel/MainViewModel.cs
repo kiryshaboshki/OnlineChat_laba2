@@ -6,6 +6,7 @@ using System;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows;
+using System.Windows.Input;
 
 namespace ChatClient.MVVM.ViewModel
 {
@@ -14,8 +15,8 @@ namespace ChatClient.MVVM.ViewModel
         public ObservableCollection<UserModel> Users { get; set; }
         public ObservableCollection<string> Messages { get; set; }
 
-        public RelayCommand ConnectToServerCommand { get; set; }
-        public RelayCommand SendMessageCommand { get; set; }
+        public ICommand ConnectToServerCommand { get; set; }
+        public ICommand SendMessageCommand { get; set; }
 
         private string _username;
         public string Username
@@ -39,23 +40,42 @@ namespace ChatClient.MVVM.ViewModel
             Messages = new ObservableCollection<string>();
             _server = new Server();
 
-            // Подписываемся на события (должны быть объявлены в Server.cs)
+            // Подписываемся на события
             _server.connectedEvent += UserConnected;
             _server.msgReceivedEvent += MessageReceived;
             _server.userDisconnectEvent += RemoveUser;
 
-            // Команды
+            // Команда подключения - используется после авторизации
             ConnectToServerCommand = new RelayCommand(
-                o => _server.ConnectToServer(Username),
+                o =>
+                {
+                    // Показываем информационное сообщение, т.к. подключение уже установлено после авторизации
+                    MessageBox.Show("Вы уже подключены к чату после авторизации.\n" +
+                                  "Отправляйте сообщения в поле ниже.",
+                                  "Информация",
+                                  MessageBoxButton.OK,
+                                  MessageBoxImage.Information);
+                },
                 o => !string.IsNullOrEmpty(Username));
 
+            // Команда отправки сообщения
             SendMessageCommand = new RelayCommand(
                 o =>
                 {
-                    _server.SendMessageToServer(Message);
-                    Message = ""; // Очищаем поле сообщения после отправки
+                    if (!string.IsNullOrEmpty(Message))
+                    {
+                        _server.SendMessageToServer(Message);
+
+                        // Добавляем свое сообщение сразу в историю
+                        Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            Messages.Add($"Вы ({DateTime.Now:HH:mm}): {Message}");
+                        });
+
+                        Message = ""; // Очищаем поле сообщения после отправки
+                    }
                 },
-                o => !string.IsNullOrEmpty(Message));
+                o => !string.IsNullOrEmpty(Message) && _server != null);
         }
 
         // Метод для установки имени пользователя после авторизации
@@ -72,7 +92,11 @@ namespace ChatClient.MVVM.ViewModel
                 var user = Users.FirstOrDefault(x => x.UID == uid);
                 if (user != null)
                 {
-                    Application.Current.Dispatcher.Invoke(() => Users.Remove(user));
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        Users.Remove(user);
+                        Messages.Add($"[СИСТЕМА] {user.Username} покинул чат");
+                    });
                 }
             }
             catch (Exception ex)
@@ -86,7 +110,16 @@ namespace ChatClient.MVVM.ViewModel
             try
             {
                 var msg = _server.PacketReader.ReadMessage();
-                Application.Current.Dispatcher.Invoke(() => Messages.Add(msg));
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    Messages.Add(msg);
+
+                    // Автоматическая прокрутка к последнему сообщению
+                    if (Messages.Count > 0)
+                    {
+                        // Тут можно добавить логику для автоскролла в UI
+                    }
+                });
             }
             catch (Exception ex)
             {
@@ -115,6 +148,7 @@ namespace ChatClient.MVVM.ViewModel
                     Application.Current.Dispatcher.Invoke(() =>
                     {
                         Users.Add(user);
+                        Messages.Add($"[СИСТЕМА] {user.Username} присоединился к чату");
                         Console.WriteLine($"Пользователь {user.Username} добавлен в список");
                     });
                 }
@@ -123,6 +157,13 @@ namespace ChatClient.MVVM.ViewModel
             {
                 Console.WriteLine($"Ошибка в UserConnected: {ex.Message}");
             }
+        }
+
+        // Метод для принудительного обновления интерфейса
+        public void ForceUpdate()
+        {
+            OnPropertyChanged(nameof(Users));
+            OnPropertyChanged(nameof(Messages));
         }
     }
 }

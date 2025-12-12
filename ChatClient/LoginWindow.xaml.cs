@@ -23,6 +23,11 @@ namespace ChatClient
             LoginPassword.PasswordChanged += (s, e) => _viewModel.LoginPassword = LoginPassword.Password;
             RegisterPassword.PasswordChanged += (s, e) => _viewModel.RegisterPassword = RegisterPassword.Password;
             RegisterConfirmPassword.PasswordChanged += (s, e) => _viewModel.RegisterConfirmPassword = RegisterConfirmPassword.Password;
+
+            // Очищаем пароли при загрузке
+            LoginPassword.Clear();
+            RegisterPassword.Clear();
+            RegisterConfirmPassword.Clear();
         }
 
         private void OnLoginSuccess(string username, string password)
@@ -68,6 +73,8 @@ namespace ChatClient
                 if (mainViewModel != null)
                 {
                     mainViewModel.SetUsername(username);
+
+                
                 }
 
                 mainWindow.Show();

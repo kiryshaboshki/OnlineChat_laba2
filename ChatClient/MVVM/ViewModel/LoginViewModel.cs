@@ -3,6 +3,7 @@ using ChatClient.Net;
 using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Windows;
 using System.Windows.Input;
 
 namespace ChatClient.MVVM.ViewModel
@@ -85,6 +86,12 @@ namespace ChatClient.MVVM.ViewModel
         {
             _server = new Server();
 
+            // Подписываемся на события сервера
+            _server.LoginSuccessEvent += OnLoginSuccess;
+            _server.LoginFailedEvent += OnLoginFailed;
+            _server.RegisterSuccessEvent += OnRegisterSuccess;
+            _server.RegisterFailedEvent += OnRegisterFailed;
+
             LoginCommand = new RelayCommand(async o =>
             {
                 if (string.IsNullOrWhiteSpace(LoginUsername))
@@ -101,7 +108,8 @@ namespace ChatClient.MVVM.ViewModel
 
                 try
                 {
-                    LoginSuccess?.Invoke(LoginUsername, LoginPassword);
+                    // ВЫЗЫВАЕМ МЕТОД СЕРВЕРА вместо просто вызова события
+                    _server.Login(LoginUsername, LoginPassword);
                 }
                 catch (Exception ex)
                 {
@@ -137,12 +145,47 @@ namespace ChatClient.MVVM.ViewModel
 
                 try
                 {
-                    RegisterSuccess?.Invoke(RegisterUsername, RegisterPassword);
+                    // ВЫЗЫВАЕМ МЕТОД СЕРВЕРА
+                    _server.Register(RegisterUsername, RegisterPassword);
                 }
                 catch (Exception ex)
                 {
                     ShowRegisterError($"Ошибка регистрации: {ex.Message}");
                 }
+            });
+        }
+
+        // Добавь эти методы в класс LoginViewModel:
+        private void OnLoginSuccess(string message)
+        {
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                // Вызываем событие для LoginWindow
+                LoginSuccess?.Invoke(LoginUsername, LoginPassword);
+            });
+        }
+
+        private void OnLoginFailed(string error)
+        {
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                ShowLoginError(error);
+            });
+        }
+
+        private void OnRegisterSuccess(string message)
+        {
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                RegisterSuccess?.Invoke(RegisterUsername, RegisterPassword);
+            });
+        }
+
+        private void OnRegisterFailed(string error)
+        {
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                ShowRegisterError(error);
             });
         }
 

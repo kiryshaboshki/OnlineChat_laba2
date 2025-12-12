@@ -3,6 +3,7 @@ using System;
 using System.IO;
 using System.Net.Sockets;
 using System.Threading.Tasks;
+using System.Windows;
 
 namespace ChatClient.Net
 {
@@ -197,11 +198,12 @@ namespace ChatClient.Net
         {
             try
             {
-                if (_client == null || !_client.Connected)
-                {
-                    Console.WriteLine("Не подключен к серверу");
-                    return;
-                }
+                //if (_client == null || !_client.Connected)
+                //{
+                //    Console.WriteLine("Не подключен к серверу");
+                //    MessageBox.Show("Не подключен к серверу", "Ошибка");
+                //    return;
+                //}
 
                 using (var packetBuilder = new PacketBuilder())
                 {
@@ -211,7 +213,6 @@ namespace ChatClient.Net
                     byte[] packetBytes = packetBuilder.GetPacketBytes();
                     Console.WriteLine($"Отправка сообщения '{message}', размер пакета: {packetBytes.Length} байт");
 
-
                     NetworkStream stream = _client.GetStream();
                     stream.Write(packetBytes, 0, packetBytes.Length);
                     stream.Flush();
@@ -219,17 +220,9 @@ namespace ChatClient.Net
                     Console.WriteLine("Сообщение отправлено успешно");
                 }
             }
-            catch (SocketException sex)
-            {
-                Console.WriteLine($"Ошибка сокета: {sex.Message}");
-            }
-            catch (IOException ioex)
-            {
-                Console.WriteLine($"Ошибка ввода-вывода: {ioex.Message}");
-            }
             catch (Exception ex)
             {
-                Console.WriteLine($"Ошибка: {ex.Message}");
+                Console.WriteLine($"Ошибка отправки: {ex.Message}");
             }
         }
     }
