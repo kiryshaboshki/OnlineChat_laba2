@@ -11,94 +11,74 @@ namespace ChatServer
 {
     class Program
     {
-        static List<Client> _clients;
-        static List<User> _users;
+        static List<Client> _authenticatedClients;
+        static List<Client> _pendingClients;
         static TcpListener _listener;
         static JsonDatabaseService _dbService;
 
         static void Main(string[] args)
         {
-            Console.Title = "Чат-Сервер";
+            InitializeServer();
 
-            _clients = new List<Client>();
-            _users = new List<User>();
+            while (true)
+            {
+                try
+                {
+                    var tcpClient = _listener.AcceptTcpClient();
+                    var client = new Client(tcpClient, _dbService);
+                    _pendingClients.Add(client);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"{DateTime.Now}: Ошибка: {ex.Message}");
+                }
+            }
+        }
+
+        static void InitializeServer()
+        {
+            _authenticatedClients = new List<Client>();
+            _pendingClients = new List<Client>();
             _dbService = new JsonDatabaseService();
 
             _listener = new TcpListener(IPAddress.Any, 7891);
             _listener.Start();
 
             Console.WriteLine("╔══════════════════════════════════════╗");
-            Console.WriteLine("║          ЧАТ-СЕРВЕР ЗАПУЩЕН          ║");
+            Console.WriteLine("║     ЧАТ-СЕРВЕР С АВТОРИЗАЦИЕЙ        ║");
             Console.WriteLine("╠══════════════════════════════════════╣");
-            Console.WriteLine($"║ Время запуска: {DateTime.Now.ToString("HH:mm:ss")}");
+            Console.WriteLine($"║ Запуск: {DateTime.Now}");
             Console.WriteLine($"║ Порт: 7891");
-            Console.WriteLine($"║ IP-адрес: {GetLocalIPAddress()}");
-            Console.WriteLine("║ Статус: Ожидание подключений...");
+            Console.WriteLine("║ Ожидание подключений...");
             Console.WriteLine("╚══════════════════════════════════════╝");
+        }
+
+        public static void AddAuthenticatedClient(Client client)
+        {
+            _authenticatedClients.Add(client);
+            _pendingClients.Remove(client);
+
+            Console.WriteLine($"✅ Аутентифицирован: {client.Username}");
+            Console.WriteLine($"   Всего онлайн: {_authenticatedClients.Count}");
             Console.WriteLine();
 
-            while (true)
-            {
-                try
-                {
-                    var client = new Client(_listener.AcceptTcpClient());
-
-                    // Проверяем, что клиент успешно создан
-                    if (client.ClientSocket == null || string.IsNullOrEmpty(client.Username))
-                        continue;
-
-                    // Проверяем, нет ли уже такого пользователя
-                    if (_clients.Any(c => c.Username == client.Username))
-                    {
-                        Console.WriteLine($"⚠ Пользователь '{client.Username}' уже подключен!");
-                        client.ClientSocket.Close();
-                        continue;
-                    }
-
-                    _clients.Add(client);
-
-                    // Создаем пользователя
-                    var user = new User
-                    {
-                        Username = client.Username,
-                        UID = client.UID
-                    };
-                    _users.Add(user);
-
-                    Console.WriteLine($" Подключен: {user.Username}");
-                    Console.WriteLine($"   UID: {user.UID}");
-                    Console.WriteLine($"   Всего онлайн: {_clients.Count}");
-                    Console.WriteLine();
-
-                    // Сохраняем в базу
-                    _dbService.SaveUser(user);
-
-                    // Рассылаем информацию о подключении
-                    BroadcastConnection();
-
-                    // Отправляем приветствие в чат
-                    BroadcastMessage($"[СИСТЕМА] {user.Username} присоединился к чату!");
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($" Ошибка: {ex.Message}");
-                }
-            }
+            BroadcastConnection();
+            BroadcastMessage($"[СИСТЕМА] {client.Username} присоединился к чату!");
         }
 
         static void BroadcastConnection()
         {
             try
             {
-                foreach (var client in _clients)
+                foreach (var client in _authenticatedClients)
                 {
-                    foreach (var user in _users)
+                    foreach (var userClient in _authenticatedClients)
                     {
                         using (var packet = new PacketBuilder())
                         {
-                            packet.WriteOpCode(1);
-                            packet.WriteMessage(user.Username);
-                            packet.WriteMessage(user.UID.ToString());
+                            packet.WriteOpCode(1); // Обновление списка пользователей
+                            packet.WriteMessage(userClient.Username);
+                            packet.WriteMessage(userClient.UID.ToString());
 
                             var bytes = packet.GetPacketBytes();
                             client.ClientSocket.Client.Send(bytes);
@@ -108,7 +88,7 @@ namespace ChatServer
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Ошибка рассылки подключений: {ex.Message}");
+                Console.WriteLine($"❌ Ошибка рассылки: {ex.Message}");
             }
         }
 
@@ -120,13 +100,13 @@ namespace ChatServer
 
             using (var packet = new PacketBuilder())
             {
-                packet.WriteOpCode(5);
+                packet.WriteOpCode(5); // Сообщение
                 packet.WriteMessage(message);
 
                 var bytes = packet.GetPacketBytes();
                 var disconnected = new List<Client>();
 
-                foreach (var client in _clients)
+                foreach (var client in _authenticatedClients)
                 {
                     try
                     {
@@ -141,7 +121,6 @@ namespace ChatServer
                     }
                 }
 
-                // Удаляем отключившихся
                 foreach (var client in disconnected)
                 {
                     RemoveClient(client.UID);
@@ -153,70 +132,49 @@ namespace ChatServer
         {
             try
             {
-                var user = _users.FirstOrDefault(u => u.UID.ToString() == uid);
-                if (user != null)
+                var client = _authenticatedClients.FirstOrDefault(c => c.UID.ToString() == uid);
+                if (client != null)
                 {
-                    Console.WriteLine($" Отключился: {user.Username}");
+                    Console.WriteLine($"🔌 Отключился: {client.Username}");
 
-                    // Отправляем пакет отключения
+                    // Отправляем уведомление об отключении
                     using (var packet = new PacketBuilder())
                     {
-                        packet.WriteOpCode(10);
+                        packet.WriteOpCode(10); // Отключение
                         packet.WriteMessage(uid);
 
                         var bytes = packet.GetPacketBytes();
 
-                        foreach (var client in _clients.Where(c => c.UID.ToString() != uid))
+                        foreach (var otherClient in _authenticatedClients.Where(c => c.UID.ToString() != uid))
                         {
                             try
                             {
-                                if (client.ClientSocket.Connected)
-                                    client.ClientSocket.Client.Send(bytes);
+                                if (otherClient.ClientSocket.Connected)
+                                    otherClient.ClientSocket.Client.Send(bytes);
                             }
                             catch { }
                         }
                     }
 
                     // Сообщаем в чат
-                    BroadcastMessage($"[СИСТЕМА] {user.Username} покинул чат!");
+                    BroadcastMessage($"[СИСТЕМА] {client.Username} покинул чат!");
 
-                    // Удаляем из списков
-                    _users.RemoveAll(u => u.UID.ToString() == uid);
-                    _clients.RemoveAll(c => c.UID.ToString() == uid);
+                    // Удаляем из списка
+                    _authenticatedClients.RemoveAll(c => c.UID.ToString() == uid);
 
-                    // Удаляем из базы
-                    _dbService.RemoveUser(Guid.Parse(uid));
-
-                    Console.WriteLine($"   Всего онлайн: {_clients.Count}");
+                    Console.WriteLine($"   Осталось онлайн: {_authenticatedClients.Count}");
                     Console.WriteLine();
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($" Ошибка отключения: {ex.Message}");
+                Console.WriteLine($"❌ Ошибка отключения: {ex.Message}");
             }
         }
 
         static void RemoveClient(Guid uid)
         {
             BroadcastDisconnect(uid.ToString());
-        }
-
-        static string GetLocalIPAddress()
-        {
-            try
-            {
-                var host = Dns.GetHostEntry(Dns.GetHostName());
-                foreach (var ip in host.AddressList)
-                {
-                    if (ip.AddressFamily == AddressFamily.InterNetwork)
-                    {
-                        return ip.ToString();
-                    }
-                }
-            }
-            catch { }
-            return "127.0.0.1";
         }
     }
 }

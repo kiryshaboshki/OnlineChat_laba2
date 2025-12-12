@@ -1,5 +1,6 @@
 ﻿using ChatServer.NET.IO;
 using ChatServer.Models;
+using ChatServer.Services;
 using System;
 using System.Net.Sockets;
 using System.Threading.Tasks;
@@ -12,43 +13,21 @@ namespace ChatServer
         public Guid UID { get; set; }
         public TcpClient ClientSocket { get; set; }
         public User UserModel { get; set; }
+        public bool IsAuthenticated { get; set; }
 
         PacketReader _packetReader;
+        private JsonDatabaseService _dbService;
 
-        public Client(TcpClient client)
+        public Client(TcpClient client, JsonDatabaseService dbService)
         {
             try
             {
                 ClientSocket = client;
-                UID = Guid.NewGuid();
+                _dbService = dbService;
                 _packetReader = new PacketReader(ClientSocket.GetStream());
 
-                // Читаем код операции
-                var opcode = _packetReader.ReadByte();
-                if (opcode != 0)
-                {
-                    Console.WriteLine($"Ошибка: неверный код операции {opcode}");
-                    client.Close();
-                    return;
-                }
+                Console.WriteLine($"{DateTime.Now}: Новое соединение от {client.Client.RemoteEndPoint}");
 
-                // Читаем имя пользователя
-                Username = _packetReader.ReadMessage();
-                if (string.IsNullOrEmpty(Username))
-                {
-                    Console.WriteLine("Ошибка: не удалось прочитать имя пользователя");
-                    client.Close();
-                    return;
-                }
-
-                // Создаем модель пользователя
-                UserModel = new User
-                {
-                    Username = this.Username,
-                    UID = this.UID
-                };
-
-                Console.WriteLine($"{DateTime.Now}: Клиент подключился с именем '{Username}'");
                 Task.Run(() => Process());
             }
             catch (Exception ex)
@@ -60,32 +39,116 @@ namespace ChatServer
 
         void Process()
         {
-            while (true)
+            try
             {
-                try
+                while (ClientSocket.Connected)
                 {
                     var opcode = _packetReader.ReadByte();
+
                     switch (opcode)
                     {
-                        case 5:
-                            var msg = _packetReader.ReadMessage();
-                            Console.WriteLine($"[{DateTime.Now}]: Получено сообщение! {msg}");
-                            Program.BroadcastMessage($"[{DateTime.Now}] : [{Username}]: {msg}");
+                        case 0: // Регистрация
+                            HandleRegistration();
+                            break;
+                        case 1: // Авторизация
+                            HandleLogin();
+                            break;
+                        case 5: // Сообщение
+                            if (IsAuthenticated)
+                            {
+                                var msg = _packetReader.ReadMessage();
+                                Console.WriteLine($"[{DateTime.Now}]: {Username}: {msg}");
+                                Program.BroadcastMessage($"[{DateTime.Now}] [{Username}]: {msg}");
+                            }
                             break;
                         default:
+                            Console.WriteLine($"Неизвестный opcode: {opcode}");
                             break;
                     }
                 }
-                catch (Exception)
+            }
+            catch (Exception)
+            {
+                Console.WriteLine($"[{UID}]: отключился");
+                if (IsAuthenticated)
                 {
-                    Console.WriteLine($"[{UID.ToString()}]: отключился");
                     Program.BroadcastDisconnect(UID.ToString());
-                    try
-                    {
-                        ClientSocket?.Close();
-                    }
-                    catch { }
-                    break;
+                }
+                try
+                {
+                    ClientSocket?.Close();
+                }
+                catch { }
+            }
+        }
+
+        void HandleRegistration()
+        {
+            var username = _packetReader.ReadMessage();
+            var password = _packetReader.ReadMessage();
+
+            Console.WriteLine($"{DateTime.Now}: Попытка регистрации: {username}");
+
+            var success = _dbService.RegisterUser(username, password);
+
+            using (var packet = new PacketBuilder())
+            {
+                packet.WriteOpCode(2); // Ответ на регистрацию
+                packet.WriteMessage(success ? "SUCCESS" : "FAIL");
+
+                var bytes = packet.GetPacketBytes();
+                ClientSocket.Client.Send(bytes);
+            }
+
+            if (success)
+            {
+                Console.WriteLine($"{DateTime.Now}: Успешная регистрация: {username}");
+            }
+        }
+
+        void HandleLogin()
+        {
+            var username = _packetReader.ReadMessage();
+            var password = _packetReader.ReadMessage();
+
+            Console.WriteLine($"{DateTime.Now}: Попытка входа: {username}");
+
+            var user = _dbService.AuthenticateUser(username, password);
+
+            if (user != null)
+            {
+                Username = user.Username;
+                UID = user.UID;
+                UserModel = user;
+                IsAuthenticated = true;
+
+                Console.WriteLine($"{DateTime.Now}: Успешный вход: {Username}");
+
+                // Добавляем в список онлайн пользователей
+                Program.AddAuthenticatedClient(this);
+
+                // Отправляем успешный ответ
+                using (var packet = new PacketBuilder())
+                {
+                    packet.WriteOpCode(3); // Успешный вход
+                    packet.WriteMessage(Username);
+                    packet.WriteMessage(UID.ToString());
+
+                    var bytes = packet.GetPacketBytes();
+                    ClientSocket.Client.Send(bytes);
+                }
+            }
+            else
+            {
+                Console.WriteLine($"{DateTime.Now}: Неудачная попытка входа: {username}");
+
+                using (var packet = new PacketBuilder())
+                {
+                    packet.WriteOpCode(4); // Неудачный вход
+                    packet.WriteMessage("Неверные учетные данные");
+
+                    var bytes = packet.GetPacketBytes();
+                    ClientSocket.Client.Send(bytes);
                 }
             }
         }
