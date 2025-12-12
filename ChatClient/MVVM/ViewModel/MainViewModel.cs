@@ -49,17 +49,34 @@ namespace ChatClient.MVVM.ViewModel
             Application.Current.Dispatcher.Invoke(() => Messages.Add(msg));
         }
 
-        private void UserConnected() 
+        private void UserConnected()
         {
-            var user = new UserModel
+            try
             {
-                Username = _server.PacketReader.ReadMessage(),
-                UID = _server.PacketReader.ReadMessage(),
-            };
+                Console.WriteLine("UserConnected вызван");
+                var username = _server.PacketReader.ReadMessage();
+                var uid = _server.PacketReader.ReadMessage();
 
-            if (!Users.Any(x => x.UID == user.UID))
+                Console.WriteLine($"Новый пользователь: {username}, UID: {uid}");
+
+                var user = new UserModel
+                {
+                    Username = username,
+                    UID = uid,
+                };
+
+                if (!Users.Any(x => x.UID == user.UID))
+                {
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        Users.Add(user);
+                        Console.WriteLine($"Пользователь {user.Username} добавлен в список");
+                    });
+                }
+            }
+            catch (Exception ex)
             {
-                Application.Current.Dispatcher.Invoke(() => Users.Add(user));
+                Console.WriteLine($"Ошибка в UserConnected: {ex.Message}");
             }
         }
     }

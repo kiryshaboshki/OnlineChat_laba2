@@ -19,18 +19,38 @@ namespace ChatServer
         PacketReader _packetReader;
         public Client(TcpClient client)
         {
-            ClientSocket = client;
-            UID = Guid.NewGuid();
-            _packetReader = new PacketReader(ClientSocket.GetStream());
+            try
+            {
+                ClientSocket = client;
+                UID = Guid.NewGuid();
+                _packetReader = new PacketReader(ClientSocket.GetStream());
 
+                // Читаем код операции
+                var opcode = _packetReader.ReadByte();
+                if (opcode != 0) // ожидаем 0 для подключения
+                {
+                    Console.WriteLine($"Ошибка: неверный код операции {opcode}");
+                    client.Close();
+                    return;
+                }
 
-            var opcode = _packetReader.ReadByte();
-            Username = _packetReader.ReadMessage();
+                // Читаем имя пользователя
+                Username = _packetReader.ReadMessage();
+                if (string.IsNullOrEmpty(Username))
+                {
+                    Console.WriteLine("Ошибка: не удалось прочитать имя пользователя");
+                    client.Close();
+                    return;
+                }
 
-
-            Console.WriteLine($"{DateTime.Now}: Client podkl s imenem {Username}");
-
-            Task.Run(() => Process());
+                Console.WriteLine($"{DateTime.Now}: Клиент подключился с именем '{Username}'");
+                Task.Run(() => Process());
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Ошибка создания клиента: {ex.Message}");
+                client.Close();
+            }
         }
 
         void Process()

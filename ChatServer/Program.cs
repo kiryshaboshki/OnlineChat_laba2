@@ -25,17 +25,19 @@ namespace ChatServer
             }
         }
 
-        static void BroadcastConnection() 
+        static void BroadcastConnection()
         {
             foreach (var user in _users)
             {
+                var broadcastPacket = new PacketBuilder();
+                broadcastPacket.WriteOpCode(1);
+                broadcastPacket.WriteMessage(user.Username);
+                broadcastPacket.WriteMessage(user.UID.ToString());
+
+               
                 foreach (var usr in _users)
                 {
-                    var broadcastPacket = new PacketBuilder();
-                    broadcastPacket.WriteOpCode(1);
-                    broadcastPacket.WriteMessage(usr.Username);
-                    broadcastPacket.WriteMessage(usr.UID.ToString());
-                    user.ClientSocket.Client.Send(broadcastPacket.GetPacketBytes());
+                    usr.ClientSocket.Client.Send(broadcastPacket.GetPacketBytes());
                 }
             }
         }
