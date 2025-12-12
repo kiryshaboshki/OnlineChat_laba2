@@ -1,9 +1,7 @@
 ﻿using ChatServer.NET.IO;
+using ChatServer.Models;
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net.Sockets;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace ChatServer
@@ -13,10 +11,10 @@ namespace ChatServer
         public string Username { get; set; }
         public Guid UID { get; set; }
         public TcpClient ClientSocket { get; set; }
-
-        
+        public User UserModel { get; set; }
 
         PacketReader _packetReader;
+
         public Client(TcpClient client)
         {
             try
@@ -27,7 +25,7 @@ namespace ChatServer
 
                 // Читаем код операции
                 var opcode = _packetReader.ReadByte();
-                if (opcode != 0) // ожидаем 0 для подключения
+                if (opcode != 0)
                 {
                     Console.WriteLine($"Ошибка: неверный код операции {opcode}");
                     client.Close();
@@ -42,6 +40,13 @@ namespace ChatServer
                     client.Close();
                     return;
                 }
+
+                // Создаем модель пользователя
+                UserModel = new User
+                {
+                    Username = this.Username,
+                    UID = this.UID
+                };
 
                 Console.WriteLine($"{DateTime.Now}: Клиент подключился с именем '{Username}'");
                 Task.Run(() => Process());
@@ -75,7 +80,12 @@ namespace ChatServer
                 {
                     Console.WriteLine($"[{UID.ToString()}]: отключился");
                     Program.BroadcastDisconnect(UID.ToString());
-                    ClientSocket.Close();
+                    try
+                    {
+                        ClientSocket?.Close();
+                    }
+                    catch { }
+                    break;
                 }
             }
         }
