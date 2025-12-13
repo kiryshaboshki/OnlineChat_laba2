@@ -4,6 +4,7 @@ using ChatClient.Net;
 using ChatClient.Net.IO;
 using System;
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Input;
@@ -40,6 +41,9 @@ namespace ChatClient.MVVM.ViewModel
             Messages = new ObservableCollection<string>();
             _server = new Server();
 
+            // ЗАГРУЖАЕМ ИСТОРИЮ ПРИ ЗАПУСКЕ
+            LoadMessages();
+
             // Подписываемся на события
             _server.connectedEvent += UserConnected;
             _server.msgReceivedEvent += MessageReceived;
@@ -70,6 +74,7 @@ namespace ChatClient.MVVM.ViewModel
                         Application.Current.Dispatcher.Invoke(() =>
                         {
                             Messages.Add($"Вы ({DateTime.Now:HH:mm}): {Message}");
+                            SaveMessages(); // СОХРАНЯЕМ ПРИ ОТПРАВКЕ
                         });
 
                         Message = ""; // Очищаем поле сообщения после отправки
@@ -95,7 +100,9 @@ namespace ChatClient.MVVM.ViewModel
                     Application.Current.Dispatcher.Invoke(() =>
                     {
                         Users.Remove(user);
-                        Messages.Add($"[СИСТЕМА] {user.Username} покинул чат");
+                        var systemMessage = $"[СИСТЕМА] {user.Username} покинул чат";
+                        Messages.Add(systemMessage);
+                        SaveMessages(); // СОХРАНЯЕМ СИСТЕМНОЕ СООБЩЕНИЕ
                     });
                 }
             }
@@ -113,12 +120,7 @@ namespace ChatClient.MVVM.ViewModel
                 Application.Current.Dispatcher.Invoke(() =>
                 {
                     Messages.Add(msg);
-
-                    // Автоматическая прокрутка к последнему сообщению
-                    if (Messages.Count > 0)
-                    {
-                        // Тут можно добавить логику для автоскролла в UI
-                    }
+                    SaveMessages(); // СОХРАНЯЕМ ПРИ ПОЛУЧЕНИИ
                 });
             }
             catch (Exception ex)
@@ -148,7 +150,9 @@ namespace ChatClient.MVVM.ViewModel
                     Application.Current.Dispatcher.Invoke(() =>
                     {
                         Users.Add(user);
-                        Messages.Add($"[СИСТЕМА] {user.Username} присоединился к чату");
+                        var systemMessage = $"[СИСТЕМА] {user.Username} присоединился к чату";
+                        Messages.Add(systemMessage);
+                        SaveMessages(); // СОХРАНЯЕМ СИСТЕМНОЕ СООБЩЕНИЕ
                         Console.WriteLine($"Пользователь {user.Username} добавлен в список");
                     });
                 }
@@ -164,6 +168,39 @@ namespace ChatClient.MVVM.ViewModel
         {
             OnPropertyChanged(nameof(Users));
             OnPropertyChanged(nameof(Messages));
+        }
+
+        private void SaveMessages()
+        {
+            try
+            {
+                // Сохраняем все сообщения в файл
+                File.WriteAllLines("chat_history.txt", Messages.ToArray());
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Ошибка сохранения: {ex.Message}");
+            }
+        }
+
+        // И загружай при старте:
+        private void LoadMessages()
+        {
+            try
+            {
+                if (File.Exists("chat_history.txt"))
+                {
+                    var savedMessages = File.ReadAllLines("chat_history.txt");
+                    foreach (var msg in savedMessages)
+                    {
+                        Messages.Add(msg);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Ошибка загрузки: {ex.Message}");
+            }
         }
     }
 }
