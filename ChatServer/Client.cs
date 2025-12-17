@@ -58,11 +58,10 @@ namespace ChatServer
                             {
                                 var msg = _packetReader.ReadMessage();
                                 Console.WriteLine($"[{DateTime.Now}]: {Username}: {msg}");
-                                Program.BroadcastMessage($"[{DateTime.Now}] [{Username}]: {msg}");
+
+                                // Отправляем в простом формате
+                                Program.BroadcastMessage($"<{Username}> {msg}");
                             }
-                            break;
-                        default:
-                            Console.WriteLine($"Неизвестный opcode: {opcode}");
                             break;
                     }
                 }
