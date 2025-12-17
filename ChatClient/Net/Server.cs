@@ -7,7 +7,7 @@ using System.Windows;
 
 namespace ChatClient.Net
 {
-    class Server
+    public class Server
     {
         TcpClient _client;
         public PacketReader PacketReader;
@@ -22,6 +22,9 @@ namespace ChatClient.Net
         public event Action<string> LoginFailedEvent;
         public event Action<string> RegisterSuccessEvent;
         public event Action<string> RegisterFailedEvent;
+
+        // ДОБАВЬТЕ ЭТО СВОЙСТВО:
+        public bool IsConnected => _client != null && _client.Connected;
 
         public Server()
         {

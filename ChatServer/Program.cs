@@ -34,6 +34,10 @@ namespace ChatServer
                 }
             }
         }
+        public static int GetClientCount()
+        {
+            return _authenticatedClients?.Count ?? 0;
+        }
 
         static void InitializeServer()
         {
@@ -96,8 +100,8 @@ namespace ChatServer
         {
             if (string.IsNullOrEmpty(message)) return;
 
-            Console.WriteLine($"💬 Рассылаю: '{message}'");
-            Console.WriteLine($"Клиентов онлайн: {_authenticatedClients.Count}");
+            Console.WriteLine($"💬 Рассылаю сообщение всем клиентам ({_authenticatedClients.Count}):");
+            Console.WriteLine($"   Сообщение: {message}");
 
             using (var packet = new PacketBuilder())
             {
@@ -106,24 +110,28 @@ namespace ChatServer
 
                 var bytes = packet.GetPacketBytes();
 
-                for (int i = 0; i < _authenticatedClients.Count; i++)
+                // Перебираем копию списка на случай изменений
+                var clientsToSend = _authenticatedClients.ToList();
+
+                foreach (var client in clientsToSend)
                 {
-                    var client = _authenticatedClients[i];
                     try
                     {
-                        if (client.ClientSocket.Connected)
+                        if (client.ClientSocket != null && client.ClientSocket.Connected)
                         {
-                            Console.WriteLine($"  → Отправляю клиенту {i}: {client.Username}");
+                            Console.WriteLine($"   → Отправляю клиенту: {client.Username} (UID: {client.UID})");
                             client.ClientSocket.Client.Send(bytes);
                         }
                         else
                         {
-                            Console.WriteLine($"  ✗ Клиент {client.Username} не подключен");
+                            Console.WriteLine($"   ✗ Клиент {client.Username} отключен, удаляю...");
+                            BroadcastDisconnect(client.UID.ToString());
                         }
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"  ✗ Ошибка отправки {client.Username}: {ex.Message}");
+                        Console.WriteLine($"   ✗ Ошибка отправки клиенту {client.Username}: {ex.Message}");
+                        BroadcastDisconnect(client.UID.ToString());
                     }
                 }
             }

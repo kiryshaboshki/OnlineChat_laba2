@@ -84,7 +84,8 @@ namespace ChatClient.MVVM.ViewModel
 
         public LoginViewModel()
         {
-            _server = new Server();
+            // ИСПРАВЬТЕ ЭТУ СТРОКУ:
+            _server = ServerManager.Instance;
 
             // Подписываемся на события сервера
             _server.LoginSuccessEvent += OnLoginSuccess;
@@ -160,6 +161,9 @@ namespace ChatClient.MVVM.ViewModel
         {
             Application.Current.Dispatcher.Invoke(() =>
             {
+                // ДОБАВЬТЕ ЭТУ СТРОКУ:
+                ServerManager.CurrentUsername = LoginUsername;
+
                 // Вызываем событие для LoginWindow
                 LoginSuccess?.Invoke(LoginUsername, LoginPassword);
             });

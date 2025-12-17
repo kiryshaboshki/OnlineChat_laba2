@@ -39,7 +39,9 @@ namespace ChatClient.MVVM.ViewModel
         {
             Users = new ObservableCollection<UserModel>();
             Messages = new ObservableCollection<string>();
-            _server = new Server();
+
+            // ИСПРАВЬТЕ ЭТУ СТРОКУ:
+            _server = ServerManager.Instance;
 
             // ЗАГРУЖАЕМ ИСТОРИЮ ПРИ ЗАПУСКЕ
             LoadMessages();

@@ -74,7 +74,11 @@ namespace ChatClient
                 {
                     mainViewModel.SetUsername(username);
 
-                
+                    // ВАЖНО: после успешной авторизации НЕ создаем новое подключение
+                    // Подключение уже установлено в LoginViewModel
+
+                    // Принудительно обновляем интерфейс
+                    mainViewModel.ForceUpdate();
                 }
 
                 mainWindow.Show();

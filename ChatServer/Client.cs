@@ -59,8 +59,8 @@ namespace ChatServer
                                 var msg = _packetReader.ReadMessage();
                                 Console.WriteLine($"[{DateTime.Now}]: {Username}: {msg}");
 
-                                // Отправляем в простом формате
-                                Program.BroadcastMessage($"<{Username}> {msg}");
+                                // Простой формат для теста
+                                Program.BroadcastMessage($"{Username}: {msg}");
                             }
                             break;
                     }
