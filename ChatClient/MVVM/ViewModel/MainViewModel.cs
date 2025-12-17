@@ -117,10 +117,13 @@ namespace ChatClient.MVVM.ViewModel
             try
             {
                 var msg = _server.PacketReader.ReadMessage();
+                Console.WriteLine($"Клиент получил сообщение: '{msg}'");
+
                 Application.Current.Dispatcher.Invoke(() =>
                 {
                     Messages.Add(msg);
-                    SaveMessages(); // СОХРАНЯЕМ ПРИ ПОЛУЧЕНИИ
+                    Console.WriteLine($"Добавлено в историю, всего сообщений: {Messages.Count}");
+                    SaveMessages();
                 });
             }
             catch (Exception ex)

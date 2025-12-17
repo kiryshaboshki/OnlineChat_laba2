@@ -96,7 +96,8 @@ namespace ChatServer
         {
             if (string.IsNullOrEmpty(message)) return;
 
-            Console.WriteLine($"💬 {message}");
+            Console.WriteLine($"💬 Рассылаю: '{message}'");
+            Console.WriteLine($"Клиентов онлайн: {_authenticatedClients.Count}");
 
             using (var packet = new PacketBuilder())
             {
@@ -104,26 +105,26 @@ namespace ChatServer
                 packet.WriteMessage(message);
 
                 var bytes = packet.GetPacketBytes();
-                var disconnected = new List<Client>();
 
-                foreach (var client in _authenticatedClients)
+                for (int i = 0; i < _authenticatedClients.Count; i++)
                 {
+                    var client = _authenticatedClients[i];
                     try
                     {
                         if (client.ClientSocket.Connected)
+                        {
+                            Console.WriteLine($"  → Отправляю клиенту {i}: {client.Username}");
                             client.ClientSocket.Client.Send(bytes);
+                        }
                         else
-                            disconnected.Add(client);
+                        {
+                            Console.WriteLine($"  ✗ Клиент {client.Username} не подключен");
+                        }
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        disconnected.Add(client);
+                        Console.WriteLine($"  ✗ Ошибка отправки {client.Username}: {ex.Message}");
                     }
-                }
-
-                foreach (var client in disconnected)
-                {
-                    RemoveClient(client.UID);
                 }
             }
         }

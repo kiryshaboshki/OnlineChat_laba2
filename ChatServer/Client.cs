@@ -62,7 +62,7 @@ namespace ChatServer
                                 // Отправляем в простом формате
                                 Program.BroadcastMessage($"<{Username}> {msg}");
                             }
-                            break;//
+                            break;
                     }
                 }
             }
